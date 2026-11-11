@@ -1,0 +1,592 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>SWRO 3D Plant</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+/* Layout: full-bleed 3D viewport left, process sidebar right (RTL). Dark, committed single look: a night-shift control-room. */
+:root{
+  --bg:#0a1117; --panel:#101a22; --line:#1f2f3b; --fg:#e4edf2; --mute:#8ba2b0;
+  --accent:#36c4cc; --warn:#f0a23b; --raw:#2f86c4; --filt:#47bfe0; --p1:#4fd1a0; --p2:#a6e36b; --demin:#f4f7a8; --brine:#e0802c; --rec:#b48cf0; --bw:#a8794f;
+  --f-ui:'Vazirmatn',system-ui,sans-serif; --f-num:'JetBrains Mono',ui-monospace,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-ui);font-size:14px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px}
+.app{display:grid;grid-template-columns:380px 1fr;gap:14px;height:100%;min-height:0}
+aside{display:flex;flex-direction:column;gap:14px;overflow:auto;min-width:0;padding-inline-end:4px}
+.stage{position:relative;min-width:0;min-height:420px;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#0c151c}
+#c{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#c.drag{cursor:grabbing}
+h1{font-size:20px;font-weight:800;margin:0;line-height:1.3}
+h2{font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--mute);margin:0 0 8px}
+.sub{color:var(--mute);margin:2px 0 0;font-size:13px}
+.cap{display:flex;gap:10px;flex-wrap:wrap}
+.cap div{flex:1 1 100px;border:1px solid var(--line);border-radius:6px;padding:8px 10px;background:var(--panel);min-width:0}
+.cap b{display:block;font-family:var(--f-num);font-size:18px;font-weight:600;direction:ltr;text-align:right}
+.cap span{color:var(--mute);font-size:12px}
+.stages{display:flex;flex-direction:column;gap:6px}
+.stages button{all:unset;cursor:pointer;display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.stages button:hover,.stages button.on{border-color:var(--accent)}
+.stages button:focus-visible,.tools button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.stages i{width:10px;height:10px;border-radius:50%;margin-top:7px;flex:none}
+.stages b{font-weight:600;display:block}
+.stages small{color:var(--mute);display:block;font-size:12px;line-height:1.5}
+.tools{position:absolute;top:10px;inset-inline-start:10px;display:flex;gap:6px;flex-wrap:wrap;z-index:2;max-width:calc(100% - 20px)}
+.tools button{all:unset;cursor:pointer;font-size:12px;padding:4px 10px;border:1px solid var(--line);border-radius:4px;background:rgba(12,21,28,.85);color:var(--fg)}
+.tools button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.legend{position:absolute;bottom:10px;inset-inline-start:10px;display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--mute);background:rgba(12,21,28,.85);padding:6px 10px;border-radius:4px;border:1px solid var(--line);max-width:calc(100% - 20px)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:14px;height:4px;border-radius:2px;display:inline-block}
+.hud{position:absolute;top:48px;inset-inline-start:10px;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;background:rgba(12,21,28,.9);border:1px solid var(--accent);border-radius:6px;padding:8px 12px;max-width:calc(100% - 20px);min-width:260px;z-index:2}
+.hud b{font-weight:600;font-size:14px;flex:1 1 100%}
+.hud span{font-family:var(--f-num);font-size:13px;color:var(--demin)}
+.hud .bar{flex:1 1 100%;height:4px;background:var(--line);border-radius:2px;overflow:hidden}
+.hud .bar i{display:block;height:100%;width:0;background:var(--accent)}
+.sel{border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:var(--panel);min-height:84px}
+.sel b{display:block;font-weight:600;margin-bottom:2px}
+.sel p{margin:0;color:var(--mute);font-size:13px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--mute);font-weight:600;font-size:11px}
+tr:last-child td{border-bottom:0}
+td.n{font-family:var(--f-num);direction:ltr;text-align:right}
+td i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-inline-end:6px}
+.note{color:var(--mute);font-size:12px;margin:0}
+@media (max-width:860px){
+  body{height:auto}
+  .app{grid-template-columns:1fr;height:auto}
+  .stage{order:-1;height:62vh;min-height:360px}
+  aside{overflow:visible}
+}
+@media (prefers-reduced-motion:reduce){#c{cursor:default}}
+</style>
+
+<div class="app" dir="rtl">
+<aside>
+  <div>
+    <h1>شبیه‌سازی سه‌بعدی واحد آب‌شیرین‌کن SWRO</h1>
+    <p class="sub">پیش‌تصفیه، اسمز معکوس دو مرحله‌ای و آب دمین، ظرفیت ۸۰٬۰۰۰ مترمکعب در روز</p>
+  </div>
+  <div class="cap" dir="rtl">
+    <div><b>3,333</b><span>m³/h آب دمین</span></div>
+    <div><b>35%</b><span>بازیابی کل</span></div>
+    <div><b>≈12 MW</b><span>توان نصب‌شده</span></div>
+    <div><b>3.6</b><span>kWh/m³ مصرف ویژه</span></div>
+  </div>
+  <div>
+    <h2>مراحل فرایند (برای رفتن به هر بخش کلیک کنید)</h2>
+    <div class="stages" id="stages"></div>
+  </div>
+  <div>
+    <h2>تجهیز یا خط انتخاب‌شده</h2>
+    <div class="sel" id="sel"><b>روی یک تجهیز یا لوله در صحنه کلیک کنید</b><p>با ماوس بچرخانید، با چرخ ماوس زوم کنید، با کلیک راست جابه‌جا کنید.</p></div>
+  </div>
+  <div>
+    <h2>جریان‌ها در ظرفیت ۸۰٬۰۰۰ m³/day</h2>
+    <div class="tbl"><table id="tbl"><thead><tr><th>جریان</th><th>m³/h</th><th>TDS ppm</th></tr></thead><tbody></tbody></table></div>
+  </div>
+  <p class="note">تعداد تجهیزات در صحنه نمایشی است و ردیف‌های ممبرین یک‌به‌یک شمرده نشده‌اند. اعداد دقیق در متن هر مرحله آمده است. فشارها و مصرف انرژی تخمین مهندسی‌اند و برای طراحی نهایی باید با WAVE یا ROSA و آنالیز کامل آب دریا بازبینی شوند.</p>
+</aside>
+
+<div class="stage" dir="ltr">
+  <canvas id="c" aria-label="مدل سه‌بعدی واحد آب‌شیرین‌کن"></canvas>
+  <div class="tools" id="tools">
+    <button data-k="flow" aria-pressed="true">Flow</button>
+    <button data-k="labels" aria-pressed="true">Labels</button>
+    <button data-k="follow" aria-pressed="false">Follow the water</button>
+    <button data-k="pause" aria-pressed="false">Pause</button>
+    <button data-k="spd" aria-pressed="false">Speed x1</button>
+    <button data-k="rot" aria-pressed="false">Auto-rotate</button>
+  </div>
+  <div class="hud" id="hud" hidden><b id="hs">Intake</b><span id="ht">TDS 45,000 ppm</span><span id="hp">1 bar</span><div class="bar"><i id="hb"></i></div></div>
+  <div class="legend">
+    <span><i style="background:var(--raw)"></i>Seawater</span>
+    <span><i style="background:var(--filt)"></i>Filtered</span>
+    <span><i style="background:#e8556a"></i>High pressure</span>
+    <span><i style="background:var(--p1)"></i>RO1 permeate</span>
+    <span><i style="background:var(--p2)"></i>RO2 permeate</span>
+    <span><i style="background:var(--demin)"></i>Demin</span>
+    <span><i style="background:var(--brine)"></i>Brine</span>
+    <span><i style="background:var(--rec)"></i>Recycle</span>
+    <span><i style="background:#9be5ff"></i>Control network</span>
+  </div>
+</div>
+</div>
+
+<script>
+(function(){
+const THREE_=window.THREE; if(!THREE_){document.querySelector('.stage').insertAdjacentHTML('beforeend','<p style="padding:20px">Three.js did not load.</p>');return;}
+const V=(x,y,z)=>new THREE.Vector3(x,y,z);
+const canvas=document.getElementById('c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x0c151c);
+scene.fog=new THREE.Fog(0x0c151c,170,420);
+const camera=new THREE.PerspectiveCamera(42,1,0.5,900);
+
+scene.add(new THREE.HemisphereLight(0xbfdfff,0x1a2a35,0.9));
+const sun=new THREE.DirectionalLight(0xffffff,0.9); sun.position.set(40,90,60); scene.add(sun);
+const sun2=new THREE.DirectionalLight(0x6aa8d8,0.35); sun2.position.set(-60,40,-50); scene.add(sun2);
+
+const C={raw:0x2f86c4,filt:0x47bfe0,hp:0xe8556a,p1:0x4fd1a0,p2:0xa6e36b,demin:0xf4f7a8,brine:0xe0802c,rec:0xb48cf0,bw:0xa8794f,chem:0xe6c040};
+const pick=[]; const labels=[]; const flows=[]; const lanes=[]; const tanks=[];
+const mat=(c,o={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,metalness:.35,roughness:.5},o));
+
+// ground
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(300,110),mat(0x16232c,{metalness:0,roughness:1}));
+ground.rotation.x=-Math.PI/2; ground.position.set(5,-0.02,0); scene.add(ground);
+const grid=new THREE.GridHelper(300,60,0x22343f,0x1a2a34); grid.position.set(5,0,0); scene.add(grid);
+// sea
+const seaGeo=new THREE.PlaneGeometry(60,110,30,40);
+const sea=new THREE.Mesh(seaGeo,new THREE.MeshStandardMaterial({color:0x1a5f94,metalness:.2,roughness:.35,transparent:true,opacity:.92,flatShading:true}));
+sea.rotation.x=-Math.PI/2; sea.position.set(-96,0.05,0); scene.add(sea);
+const seaBase=seaGeo.attributes.position.array.slice();
+
+function reg(m,title,text){m.userData.info={title,text};pick.push(m);return m}
+function box(w,h,d,x,y,z,color,info){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color));m.position.set(x,y,z);scene.add(m);if(info)reg(m,...info);return m}
+function cyl(r,h,x,y,z,color,info,axis='y',seg=24){const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,seg),mat(color));
+  if(axis==='x')m.rotation.z=Math.PI/2; if(axis==='z')m.rotation.x=Math.PI/2;
+  m.position.set(x,y,z);scene.add(m);if(info)reg(m,...info);return m}
+function tank(r,h,x,y,z,color,info,wcol,amp){
+  const shell=cyl(r,h,x,y,z,color,info,'y',36);shell.material.transparent=true;shell.material.opacity=.3;shell.material.depthWrite=false;
+  const w=new THREE.Mesh(new THREE.CylinderGeometry(r*.96,r*.96,1,36),new THREE.MeshStandardMaterial({color:wcol,metalness:.1,roughness:.2,transparent:true,opacity:.85,emissive:wcol,emissiveIntensity:.15}));
+  w.position.set(x,y,z);scene.add(w);tanks.push({w,bottom:y-h/2+.1,h:h-.4,base:.62,amp:amp||.08,ph:Math.random()*6});return shell}
+function label(text,x,y,z,color='#e4edf2',sc=1){
+  const c=document.createElement('canvas');const g=c.getContext('2d');const fs=34;
+  g.font='600 '+fs+'px JetBrains Mono, monospace';const w=Math.ceil(g.measureText(text).width)+24;c.width=w;c.height=fs+20;
+  g.font='600 '+fs+'px JetBrains Mono, monospace';
+  g.fillStyle='rgba(10,17,23,.82)';g.fillRect(0,0,c.width,c.height);
+  g.strokeStyle='rgba(54,196,204,.7)';g.lineWidth=2;g.strokeRect(1,1,c.width-2,c.height-2);
+  g.fillStyle=color;g.textBaseline='middle';g.fillText(text,12,c.height/2+2);
+  const t=new THREE.CanvasTexture(c);t.minFilter=THREE.LinearFilter;
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:false,transparent:true}));
+  const k=0.055*sc;s.scale.set(c.width*k,c.height*k,1);s.position.set(x,y,z);s.renderOrder=10;scene.add(s);labels.push(s);return s}
+
+// pipes with flowing particles
+const Y=V(0,1,0);
+const dotGeo=new THREE.SphereGeometry(1,6,6);
+function pipe(pts,color,r,info,opt={}){
+  const v=pts.map(p=>V(...p)); const cum=[0];
+  for(let i=1;i<v.length;i++){
+    const a=v[i-1],b=v[i],d=b.clone().sub(a),len=d.length();cum.push(cum[i-1]+len);
+    const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,10),mat(color,{metalness:.5,roughness:.4}));
+    m.position.copy(a.clone().add(b).multiplyScalar(.5));m.quaternion.setFromUnitVectors(Y,d.normalize());scene.add(m);
+    if(info)reg(m,...info);
+    if(i<v.length-1){const j=new THREE.Mesh(new THREE.SphereGeometry(r,10,10),mat(color,{metalness:.5,roughness:.4}));j.position.copy(b);scene.add(j);}
+  }
+  if(opt.still)return;
+  const len=cum[cum.length-1],n=Math.max(2,Math.floor(len/3.2));
+  const inst=new THREE.InstancedMesh(dotGeo,new THREE.MeshBasicMaterial({color:new THREE.Color(color).lerp(new THREE.Color(0xffffff),.55)}),n);
+  inst.frustumCulled=false;scene.add(inst);
+  flows.push({v,cum,len,n,inst,r:Math.max(r*1.0,0.3),speed:opt.speed||5});
+}
+const dummy=new THREE.Object3D();
+function updateFlows(t){
+  for(const f of flows){
+    for(let i=0;i<f.n;i++){
+      let d=((t*f.speed)+i*f.len/f.n)%f.len,k=1;
+      while(k<f.cum.length-1&&f.cum[k]<d)k++;
+      const s=(d-f.cum[k-1])/(f.cum[k]-f.cum[k-1]);
+      dummy.position.copy(f.v[k-1]).lerp(f.v[k],s);dummy.scale.setScalar(f.r);dummy.updateMatrix();f.inst.setMatrixAt(i,dummy.matrix);
+    }
+    f.inst.instanceMatrix.needsUpdate=true;
+  }
+}
+
+/* ---------- stream info ---------- */
+const S={
+ raw:['خط آب دریا','9,603 m³/h، TDS ≈ 45,000 ppm، دمای طراحی 25°C'],
+ pre:['آب پیش‌تصفیه‌شده','8,931 m³/h، TDS ≈ 45,000 ppm (املاح محلول در پیش‌تصفیه حذف نمی‌شوند)، SDI15 کمتر از 3'],
+ hp:['خط فشار قوی SWRO','≈ 9,329 m³/h به همه قطارها، فشار طراحی 68 تا 72 bar'],
+ p1:['پرمییت مرحله اول','3,732 m³/h، TDS ≈ 500 ppm'],
+ p2:['پرمییت مرحله دوم','3,584 m³/h، TDS ≈ 10 ppm'],
+ dem:['آب دمین','3,333 m³/h = 80,000 m³/day، TDS ≈ 0.05 ppm'],
+ br:['پساب شور (Brine)','5,597 m³/h، TDS ≈ 71,800 ppm، فشار باقی‌مانده به ERD داده می‌شود'],
+ rec:['بازگشت ریجکت RO2','398 m³/h، TDS ≈ 4,700 ppm، به مکش پمپ‌های RO1'],
+ edi:['ریجکت EDI','251 m³/h، TDS ≈ 142 ppm، به خوراک RO2'],
+ bw:['شست‌وشوی معکوس فیلترها','≈ 672 m³/h به‌صورت متناوب، حاوی ذرات و لجن، پیش از دفع تصفیه شود'],
+ chem:['خط تزریق شیمیایی','پمپ دوزینگ با کنترل دبی متناسب با جریان']
+};
+
+/* ---------- INTAKE ---------- */
+box(6,3,10,-62,1.5,0,0x2c3e4a,['سازه آبگیری','آبگیری از دریا با پمپ‌های ثانویه و غربال. 9,603 m³/h آب خام.']);
+for(let i=-1;i<=1;i++) cyl(.8,3,-62,3.9,i*3,0x3d5568,['پمپ آبگیری','پمپ‌های عمودی آب دریا با یک پمپ رزرو'],'y',16);
+label('SEAWATER INTAKE',-62,8,0);
+pipe([[-60,1.8,0],[-52,1.8,0]],C.raw,.55,S.raw);
+
+/* coagulation tank */
+tank(4,5,-48,2.5,0,0x6fa8c8,['مخزن انعقاد و لخته‌سازی','FeCl3 حدود 1 تا 3 mg/L، زمان ماند 10 تا 15 دقیقه، همزن آهسته'],0x2f86c4,.1);
+cyl(.12,6,-48,6.2,0,0x9fb7c6,null,'y',8); box(3.2,.12,.5,-48,3.6,0,0x9fb7c6);
+label('COAGULATION',-48,9,0);
+cyl(1,2.5,-48,1.25,-9,C.chem,['مخزن FeCl3','ماده منعقدکننده، دوزینگ متناسب با کدورت']);
+pipe([[-48,2.5,-8],[-48,2.5,-4]],C.chem,.2,S.chem,{speed:3});
+pipe([[-44,2,0],[-38,2,0]],C.raw,.55,S.raw);
+pipe([[-38,2,0],[-38,2,-14]],C.raw,.45,S.raw);
+pipe([[-38,2,0],[-38,2,14]],C.raw,.45,S.raw);
+
+/* DMF filters */
+for(let i=0;i<12;i++){const z=-13.75+i*2.5;
+  cyl(1,8,-33,1.2,z,0x58788c,['فیلتر دولایه (DMF)','حدود 24 فیلتر افقی از جنس فولاد با پوشش، سرعت عبور 8 تا 10 m/h، ماسه و آنتراسیت. در صحنه 12 فیلتر نمایش داده شده است.'],'x',20);
+  pipe([[-38,2,z],[-37,1.4,z]],C.raw,.22,S.raw,{still:true});
+  pipe([[-29,1.4,z],[-27,2,z]],C.filt,.22,S.pre,{still:true});}
+label('DUAL MEDIA FILTERS x24',-33,5.5,-17);
+pipe([[-27,2,-14],[-27,2,0]],C.filt,.45,S.pre);
+pipe([[-27,2,14],[-27,2,0]],C.filt,.45,S.pre);
+pipe([[-27,2,0],[-19,2,0]],C.filt,.55,S.pre);
+pipe([[-33,0.3,-15],[-33,0.3,-18]],C.bw,.4,S.bw);
+cyl(2,3,-33,1.5,-20,C.bw,['مخزن پساب شست‌وشو','جمع‌آوری پساب بک‌واش و تصفیه قبل از دفع']);
+pipe([[-33,0.3,-22],[-85,0.3,-22]],C.bw,.4,S.bw);
+
+/* cartridge filters */
+pipe([[-19,2,-6.25],[-19,2,6.25]],C.filt,.4,S.pre,{still:true});
+pipe([[-19,2,0],[-19,2,-6.25]],C.filt,.4,S.pre);
+pipe([[-19,2,0],[-19,2,6.25]],C.filt,.4,S.pre);
+for(let i=0;i<6;i++){const z=-6.25+i*2.5;
+  cyl(.7,3.2,-16,1.6,z,0x6f90a3,['فیلتر کارتریج 5 میکرون','محافظت نهایی ممبرین‌ها، بعد از تزریق SBS و آنتی‌اسکالانت'],'y',16);
+  pipe([[-19,2,z],[-16.7,2,z]],C.filt,.22,S.pre,{still:true});
+  pipe([[-15.3,1.5,z],[-13,1.5,z]],C.filt,.22,S.pre,{still:true});}
+label('CARTRIDGE FILTERS',-16,5.6,0);
+cyl(1,2.5,-13,1.25,-11,C.chem,['مخزن SBS و آنتی‌اسکالانت','حذف کلر باقی‌مانده و جلوگیری از رسوب روی ممبرین']);
+pipe([[-13,2.5,-10],[-13,1.5,-6.25]],C.chem,.2,S.chem,{speed:3});
+pipe([[-13,1.5,-6.25],[-13,1.5,0]],C.filt,.45,S.pre);
+pipe([[-13,1.5,6.25],[-13,1.5,0]],C.filt,.45,S.pre);
+pipe([[-13,1.5,0],[-9,1.5,0]],C.filt,.55,S.pre);
+pipe([[-9,1.5,0],[-9,1.5,-14.7]],C.filt,.45,S.pre);
+pipe([[-9,1.5,0],[-9,1.5,14.7]],C.filt,.45,S.pre);
+
+/* ---------- SWRO ---------- */
+const Z8=[];for(let i=0;i<8;i++)Z8.push(-14.7+i*4.2);
+Z8.forEach((z,i)=>{
+  // HP pump
+  box(3.2,.5,1.8,-4,.25,z,0x26343e);
+  cyl(.8,2.6,-4.8,1.4,z,0xc83d52,['پمپ فشار قوی SWRO '+(i+1),'پمپ سانتریفیوژ دوفازی، 8 دستگاه در سرویس و یک رزرو. فشار طراحی حدود 68 تا 72 bar.'],'x',20);
+  cyl(.6,1.4,-2.7,1.2,z,0x9aa7b0,null,'x',16);
+  pipe([[-9,1.5,z],[-6.4,1.5,z]],C.filt,.3,S.pre,{still:true});
+  pipe([[-2,1.2,z],[8,1.2,z],[10.6,1.8,z]],C.hp,.38,S.hp);
+  // rack
+  box(8.6,.25,3.9,15,.12,z,0x2a3944);
+  const info=['قطار SWRO شماره '+(i+1),'هر قطار حدود 160 لوله فشار با 6 المان 8 اینچی (حدود 960 المان). مجموع هشت قطار حدود 7,700 المان SW30HRLE-440، شار 13 LMH، بازیابی 40%.'];
+  for(let a=0;a<4;a++)for(let b=0;b<4;b++){
+    {const m=cyl(.33,8,15,.7+a*.85,z-1.2+b*.8,0x7ec4d8,info,'x',12);m.material.transparent=true;m.material.opacity=.42;lanes.push({x0:11,x1:19,y:.7+a*.85,z:z-1.2+b*.8,c0:C.hp,c1:C.brine});}
+  }
+  pipe([[19.2,.9,z],[23,.9,z]],C.brine,.3,S.br,{still:true});
+  pipe([[19.2,2.9,z],[21,2.9,z]],C.p1,.28,S.p1,{still:true});
+});
+label('SWRO PASS 1 : 8 TRAINS',15,6,0);
+label('HP PUMPS',-4,3.8,-16.5);
+pipe([[-9,1.5,-14.7],[-9,1.5,-20]],C.filt,.01,null,{still:true});
+
+/* RO1 permeate, brine, ERD */
+pipe([[21,2.9,-14.7],[21,2.9,0]],C.p1,.4,S.p1);
+pipe([[21,2.9,14.7],[21,2.9,0]],C.p1,.4,S.p1);
+pipe([[21,2.9,0],[21,6.5,0],[38,6.5,0],[38,4,0]],C.p1,.5,S.p1);
+pipe([[23,.9,-14.7],[23,.9,0]],C.brine,.45,S.br);
+pipe([[23,.9,14.7],[23,.9,0]],C.brine,.45,S.br);
+pipe([[23,.9,0],[27.2,.9,0]],C.brine,.55,S.br);
+for(let i=0;i<4;i++)cyl(1,4,29,2,-6+i*4,0xdfe6ea,['مبدل فشار ایزوباریک (ERD)','فشار پساب شور را با راندمان حدود 96% به خوراک منتقل می‌کند و انرژی پمپ فشار قوی را کاهش می‌دهد.'],'y',24);
+label('ISOBARIC ERD',29,5.2,0);
+pipe([[30.8,.9,0],[33,.9,0],[33,.9,24],[-86,.9,24]],C.brine,.55,S.br);
+for(let i=0;i<6;i++)cyl(.25,2,-82-i*0,1,18+i*0+ (i*1.0) ,C.brine,null,'y',8);
+label('BRINE OUTFALL DIFFUSER',-80,4,24);
+label('SEA',-96,3,-6,'#6fb3e6');
+
+/* ---------- RO1 permeate tank, RO2 ---------- */
+tank(4,5,42,2.5,0,0x6fc4a4,['مخزن میانی پرمییت RO1','3,732 m³/h با TDS حدود 500 ppm، مخزن بافر میان دو مرحله'],0x4fd1a0,.1);
+label('RO1 PERMEATE TANK',42,8,0);
+pipe([[46,2,0],[48,2,0]],C.p1,.5,S.p1);
+pipe([[48,2,0],[48,2,-6.3]],C.p1,.4,S.p1);
+pipe([[48,2,0],[48,2,6.3]],C.p1,.4,S.p1);
+cyl(1,2.5,44,1.25,-10,C.chem,['مخزن NaOH','تنظیم pH حدود 9 برای بهبود جداسازی بور و CO2']);
+pipe([[44,2.5,-9.5],[48,2.5,-9.5],[48,2,-6.3]],C.chem,.2,S.chem,{speed:3});
+const Z4=[-6.3,-2.1,2.1,6.3];
+Z4.forEach((z,i)=>{
+  box(2.6,.5,1.6,51,.25,z,0x26343e);
+  cyl(.7,2.4,50.2,1.3,z,0x2f9e6c,['پمپ مرحله دوم '+(i+1),'پمپ سانتریفیوژ، فشار حدود 8 تا 12 bar'],'x',20);
+  pipe([[48,2,z],[49,1.4,z]],C.p1,.3,S.p1,{still:true});
+  pipe([[52.4,1.2,z],[55,1.2,z]],C.p1,.3,S.p1);
+  box(7,.25,3.9,58.5,.12,z,0x2a3944);
+  const info=['قطار BWRO مرحله دوم '+(i+1),'هر قطار حدود 200 لوله فشار با 6 المان 8 اینچی، مجموع حدود 4,850 المان BW30-400. شار 20 LMH، بازیابی 90%.'];
+  for(let a=0;a<4;a++)for(let b=0;b<4;b++){const m=cyl(.33,6,58.5,.7+a*.85,z-1.2+b*.8,0xa5d98a,info,'x',12);m.material.transparent=true;m.material.opacity=.42;lanes.push({x0:55.5,x1:61.5,y:.7+a*.85,z:z-1.2+b*.8,c0:C.p1,c1:C.rec});}
+  pipe([[62,2.9,z],[64,2.9,z]],C.p2,.28,S.p2,{still:true});
+  pipe([[62,.9,z],[63,.9,z]],C.rec,.28,S.rec,{still:true});
+});
+label('BWRO PASS 2 : 4 TRAINS',58.5,6,0);
+label('PASS 2 PUMPS',51,3.6,-9);
+pipe([[64,2.9,-6.3],[64,2.9,0]],C.p2,.4,S.p2);
+pipe([[64,2.9,6.3],[64,2.9,0]],C.p2,.4,S.p2);
+pipe([[64,2.9,0],[68,2.9,0]],C.p2,.5,S.p2);
+tank(4,5,72,2.5,0,0x9fd47c,['مخزن ذخیره پرمییت RO2','3,584 m³/h با TDS حدود 10 ppm. آب مرحله دوم ابتدا در این مخزن جداگانه ذخیره می‌شود و سپس با پمپ به واحد دمین می‌رود.'],0xa6e36b,.1);
+label('RO2 PERMEATE TANK',72,8,0);
+// RO2 reject recycle
+pipe([[63,.9,6.3],[63,.9,-12],[63,.9,-20],[63,7,-20],[-9,7,-20],[-9,1.5,-20],[-9,1.5,-14.7]],C.rec,.38,S.rec);
+
+/* ---------- DEMIN (zone 3) ---------- */
+// feed pump from RO2 tank
+pipe([[76,2.9,0],[78.8,2.9,0]],C.p2,.5,S.p2);
+box(2.6,.5,1.6,80.5,.25,0,0x26343e);
+cyl(.7,2.4,80,1.3,0,0xc9b84a,['پمپ خوراک واحد دمین','انتقال آب RO2 از مخزن ذخیره به ماژول‌های EDI'],'x',20);
+pipe([[82.2,2.9,0],[86,2.9,0]],C.p2,.5,S.p2);
+pipe([[86,2.9,0],[86,2.9,-6.3]],C.p2,.4,S.p2);
+pipe([[86,2.9,0],[86,2.9,6.3]],C.p2,.4,S.p2);
+Z4.forEach((z,i)=>{
+  box(5,3.2,3,90.2,1.6,z,0x4c5f86,['ماژول EDI '+(i+1),'الکترودیونیزاسیون پیوسته بدون مصرف اسید و سود. بازیابی 93%، خروجی حدود 0.1 تا 0.5 ppm.']);
+  box(4.6,.5,2.6,90.2,3.4,z,0x6b82b8);
+  pipe([[86,2.9,z],[87.7,2.9,z]],C.p2,.25,S.p2,{still:true});
+  pipe([[92.7,2.4,z],[97.2,2.4,z]],C.demin,.25,S.dem,{still:true});
+  cyl(1.1,4.2,98.2,2.1,z,0xd9d36a,['بستر مخلوط صیقل‌دهنده (Mixed Bed)','کاتیونی و آنیونی، نهایی‌سازی کیفیت تا 0.05 ppm (بیش از 10 MΩ·cm)'],'y',24);
+  pipe([[99.3,2.4,z],[102,2.4,z]],C.demin,.25,S.dem,{still:true});
+  pipe([[90.2,3.7,z],[90.2,5,z]],C.edi,.2,S.edi,{still:true});
+});
+label('EDI x4',90.2,6.4,-9);
+label('MIXED BED POLISHERS',98.2,6.8,-9);
+label('DEMIN FEED PUMP',80,3.8,-3);
+pipe([[102,2.4,-6.3],[102,2.4,0]],C.demin,.4,S.dem);
+pipe([[102,2.4,6.3],[102,2.4,0]],C.demin,.4,S.dem);
+pipe([[102,2.4,0],[104,2.4,0]],C.demin,.5,S.dem);
+tank(6,7,110,3.5,0,0xe6e8a8,['مخزن ذخیره آب دمین','ظرفیت ذخیره حدود 6 ساعت. مجموع تولید 80,000 m³/day با TDS نزدیک 0.05 ppm'],0xf4f7a8,.14);
+label('DEMIN STORAGE TANK 80,000 m3/d',110,10.5,0,'#f4f7a8');
+pipe([[90.2,5,6.3],[90.2,5,-14],[48,5,-14],[48,2,-14],[48,2,-6.3]],C.edi,.3,S.edi,{});
+
+/* ---------- ZONES, SAMPLE BOARDS, CONTROL SYSTEM ---------- */
+function zone(x0,x1,z0,z1,hex,title){
+  const w=x1-x0,d=z1-z0,cx=(x0+x1)/2,cz=(z0+z1)/2;
+  const sl=new THREE.Mesh(new THREE.BoxGeometry(w,.16,d),new THREE.MeshStandardMaterial({color:new THREE.Color(hex).multiplyScalar(.3),roughness:.9,metalness:0}));
+  sl.position.set(cx,.06,cz);scene.add(sl);
+  const em=mat(hex,{emissive:hex,emissiveIntensity:.45});
+  [[w,.5,.35,cx,.4,z0],[w,.5,.35,cx,.4,z1],[.35,.5,d,x0,.4,cz],[.35,.5,d,x1,.4,cz]].forEach(a=>{const m=new THREE.Mesh(new THREE.BoxGeometry(a[0],a[1],a[2]),em);m.position.set(a[3],a[4],a[5]);scene.add(m)});
+  [[x0,z0],[x1,z0],[x0,z1],[x1,z1]].forEach(a=>{const m=new THREE.Mesh(new THREE.BoxGeometry(.6,7,.6),em);m.position.set(a[0],3.5,a[1]);scene.add(m)});
+  label(title,cx,13,z1,'#'+new THREE.Color(hex).getHexString(),1.5);
+}
+zone(-10.5,34.5,-21.5,21.5,0x4fd1a0,'ZONE 1 | RO1 SEAWATER RO');
+zone(46.8,66.5,-15,15,0xa6e36b,'ZONE 2 | RO2 BRACKISH RO');
+zone(78,107.5,-15,15,0xf4f7a8,'ZONE 3 | DEMIN EDI + MIXED BED');
+[42,72,110].forEach(x=>{const r=x===110?7.5:5;const pad=new THREE.Mesh(new THREE.BoxGeometry(r*2,.16,r*2),mat(0x2a3844,{metalness:0,roughness:1}));pad.position.set(x,.06,0);scene.add(pad)});
+
+const boards=[],leds=[];
+function board(x,z,tapY,tapZ,o){
+  pipe([[x,tapY,tapZ],[x,tapY,z-.9]],o.col,.14,['خط نمونه‌برداری '+o.tag,'خط کوچک انحراف جریان از هدر پرمییت برای آنالایزر'],{speed:3});
+  box(1.8,1.8,1.2,x,tapY,z,0x2d3b46,['آنالایزر '+o.tag,'سنجش آنلاین هدایت الکتریکی و TDS در نقطه نمونه‌برداری '+o.name]);
+  cyl(.1,1.4,x-.6,4.5,z,0x9aa7b0,null,'y',8);cyl(.1,1.4,x+.6,4.5,z,0x9aa7b0,null,'y',8);
+  const g=new THREE.Group();g.position.set(x,7.2,z);scene.add(g);
+  const cv=document.createElement('canvas');cv.width=560;cv.height=380;const tex=new THREE.CanvasTexture(cv);tex.minFilter=THREE.LinearFilter;
+  const scr=new THREE.Mesh(new THREE.PlaneGeometry(7.4,5.02),new THREE.MeshBasicMaterial({map:tex}));scr.position.z=.14;g.add(scr);
+  const back=new THREE.Mesh(new THREE.BoxGeometry(7.8,5.4,.2),mat(0x1b2a34));g.add(back);
+  reg(back,'برد نمونه‌برداری '+o.tag,'نمایش آنلاین TDS خروجی '+o.name+'، حد مجاز '+o.specTxt);
+  boards.push({g,ctx:cv.getContext('2d'),tex,o,ph:Math.random()*6,hist:[],v:o.tds,acc:9});
+  // PLC cabinet + signal line
+  box(1.8,2.6,.9,x+3.6,1.3,z,0x2d3b46,['کابینت '+o.plc,'PLC مستقل این بخش، متصل به شبکه کنترل یکپارچه']);
+  const led=new THREE.Mesh(new THREE.SphereGeometry(.18,8,8),new THREE.MeshBasicMaterial({color:0x2fe08a}));led.position.set(x+3.6,2.3,z+.5);scene.add(led);leds.push(led);
+  label(o.plc,x+3.6,4,z,'#9be5ff');
+  pipe([[x+.9,tapY,z],[x+2.7,tapY,z],[x+2.7,1.6,z],[x+2.7,1.6,z]].slice(0,3),0x9be5ff,.07,['سیگنال ابزار دقیق','سیگنال 4 تا 20 میلی‌آمپر از آنالایزر به PLC'],{speed:6});
+}
+board(21,19.5,2.9,14.7,{tag:'SP-1',name:'RO1 permeate',css:'#4fd1a0',col:C.p1,tds:500,spec:500,specTxt:'500 ppm',var:.02,flow:'3,732',mode:'ph',ph:'6.4',plc:'PLC-1'});
+board(64,12.5,2.9,6.3,{tag:'SP-2',name:'RO2 permeate',css:'#a6e36b',col:C.p2,tds:10,spec:10,specTxt:'10 ppm',var:.03,flow:'3,584',mode:'ph',ph:'8.1',plc:'PLC-2'});
+board(102,12.5,2.4,6.3,{tag:'SP-3',name:'Demin water',css:'#f4f7a8',col:C.demin,tds:.05,spec:.05,specTxt:'0.05 ppm',var:.04,flow:'3,333',mode:'res',plc:'PLC-3'});
+function fv(v){return v>=100?Math.round(v).toLocaleString('en-US'):v>=1?v.toFixed(1):v.toFixed(3)}
+function drawBoard(b){
+  const g=b.ctx,o=b.o,v=b.v;
+  g.clearRect(0,0,560,380);g.fillStyle='#0a131a';g.fillRect(0,0,560,380);
+  g.fillStyle=o.css;g.fillRect(0,0,560,54);
+  g.fillStyle='#0a131a';g.font='700 27px JetBrains Mono, monospace';g.textBaseline='middle';g.textAlign='left';g.fillText(o.tag+'  '+o.name.toUpperCase(),16,28);
+  g.fillStyle='#8ba2b0';g.font='400 19px JetBrains Mono, monospace';g.fillText('OUTLET TDS',16,86);
+  g.fillStyle='#ffffff';g.font='700 78px JetBrains Mono, monospace';const t=fv(v);g.fillText(t,16,150);
+  const w=g.measureText(t).width;g.fillStyle=o.css;g.font='600 26px JetBrains Mono, monospace';g.fillText('ppm',24+w,162);
+  // sparkline
+  const h=b.hist;if(h.length>2){const mn=Math.min(...h),mx=Math.max(...h),r=(mx-mn)||1;g.strokeStyle=o.css;g.lineWidth=2;g.beginPath();
+    h.forEach((y,i)=>{const px=330+i*(214/47),py=190-((y-mn)/r)*36-6;i?g.lineTo(px,py):g.moveTo(px,py)});g.stroke()}
+  const ec=v/.65;
+  const rows=[['Conductivity',(ec>=100?Math.round(ec):ec.toFixed(3))+' uS/cm'],['Flow',o.flow+' m3/h'],o.mode==='res'?['Resistivity',(1/ec).toFixed(1)+' MOhm.cm']:['pH',o.ph]];
+  rows.forEach((r,i)=>{const y=222+i*36;g.fillStyle='#8ba2b0';g.font='400 19px JetBrains Mono, monospace';g.fillText(r[0],16,y);g.fillStyle='#e4edf2';g.font='600 22px JetBrains Mono, monospace';g.textAlign='right';g.fillText(r[1],544,y);g.textAlign='left'});
+  const ok=v<=o.spec*1.0001;g.fillStyle='#8ba2b0';g.font='400 19px JetBrains Mono, monospace';g.fillText('SPEC <= '+o.specTxt,16,350);
+  g.fillStyle=ok?'#2fbf7a':'#e0602c';g.fillRect(410,330,134,36);g.fillStyle='#07120d';g.font='700 20px JetBrains Mono, monospace';g.textAlign='center';g.fillText(ok?'IN SPEC':'ALARM',477,349);g.textAlign='left';
+  b.tex.needsUpdate=true;
+}
+// central control room
+const CR={x:62,z:-38};
+box(28,5,9,CR.x,2.5,CR.z,0x34444f,['اتاق کنترل مرکزی (DCS / SCADA)','سیستم کنترل یکپارچه برای هر سه بخش RO1، RO2 و دمین. تمام PLCها با شبکه صنعتی به این اتاق متصل‌اند و کنترل، آلارم و ثبت داده در یک‌جا انجام می‌شود.']);
+box(28.6,.5,9.6,CR.x,5.25,CR.z,0x1e2b34);
+cyl(.15,6,CR.x+11,8.2,CR.z,0x9aa7b0,null,'y',8);
+const crc=document.createElement('canvas');crc.width=880;crc.height=330;const crt=new THREE.CanvasTexture(crc);crt.minFilter=THREE.LinearFilter;
+const crs=new THREE.Mesh(new THREE.PlaneGeometry(22,8.25),new THREE.MeshBasicMaterial({map:crt}));crs.position.set(CR.x,2.7,CR.z+4.6);scene.add(crs);
+label('CENTRAL CONTROL ROOM  DCS / SCADA',CR.x,10.5,CR.z,'#9be5ff',1.3);
+const netCol=0x9be5ff;
+[[21+3.6,19.5,9,-8],[64+3.6,12.5,9.8,0],[102+3.6,12.5,10.6,8]].forEach((a,i)=>{
+  const sx=CR.x+a[3];
+  pipe([[sx,5.5,CR.z],[sx,a[2],CR.z],[a[0],a[2],CR.z],[a[0],a[2],a[1]],[a[0],2.8,a[1]]],netCol,.12,['شبکه کنترل یکپارچه','لینک صنعتی (Ethernet / Profinet) بین PLC-'+(i+1)+' و اتاق کنترل مرکزی'],{speed:12});
+});
+function drawCR(){
+  const g=crc.getContext('2d');g.fillStyle='#08121a';g.fillRect(0,0,880,330);
+  g.fillStyle='#36c4cc';g.fillRect(0,0,880,50);g.fillStyle='#08121a';g.font='700 26px JetBrains Mono, monospace';g.textBaseline='middle';g.fillText('INTEGRATED CONTROL  |  NETWORK OK  |  3 PLC ONLINE',16,26);
+  g.fillStyle='#8ba2b0';g.font='400 19px JetBrains Mono, monospace';
+  [['ZONE','OUTLET TDS','FLOW m3/h','STATUS'],].forEach(r=>{g.fillText(r[0],16,82);g.fillText(r[1],250,82);g.fillText(r[2],520,82);g.fillText(r[3],720,82)});
+  boards.forEach((b,i)=>{const y=130+i*62,o=b.o,ok=b.v<=o.spec*1.0001;
+    g.fillStyle=o.css;g.fillRect(16,y-20,8,40);g.fillStyle='#e4edf2';g.font='600 26px JetBrains Mono, monospace';g.fillText(o.plc.replace('PLC-','Z')+' '+o.name.replace(' permeate','').toUpperCase(),34,y);
+    g.fillText(fv(b.v)+' ppm',250,y);g.fillText(o.flow,520,y);g.fillStyle=ok?'#2fbf7a':'#e0602c';g.fillRect(720,y-16,130,32);g.fillStyle='#07120d';g.font='700 19px JetBrains Mono, monospace';g.fillText(ok?'IN SPEC':'ALARM',738,y+1)});
+  g.fillStyle='#8ba2b0';g.font='400 18px JetBrains Mono, monospace';g.fillText('Setpoints: RO1<=500  RO2<=10  DEMIN<=0.05 ppm   |   Trend, alarm and report on one HMI',16,312);
+  crt.needsUpdate=true}
+function updateBoards(t,dt){
+  for(const b of boards){
+    b.g.rotation.y=Math.atan2(camera.position.x-b.g.position.x,camera.position.z-b.g.position.z);
+    b.acc+=dt;if(b.acc>.5){b.acc=0;b.v=b.o.tds*(1+b.o.var*(Math.sin(t*.9+b.ph)*.6+Math.sin(t*2.3+b.ph*2)*.4));b.hist.push(b.v);if(b.hist.length>48)b.hist.shift();drawBoard(b);crAcc=1}
+  }
+  if(crAcc){crAcc=0;drawCR()}
+  const on=Math.sin(t*5)>0;leds.forEach((l,i)=>l.material.color.setHex((on?i%2==0:i%2==1)?0x2fe08a:0x1a6b44));
+}
+let crAcc=1;
+
+
+/* ---------- camera control ---------- */
+const view={tx:5,ty:0,tz:0,dist:170,az:.55,pol:1.0};
+const goal={...view};
+const presets={
+ all:{tx:12,ty:0,tz:-4,dist:225,az:.55,pol:1.0},
+ pre:{tx:-34,ty:0,tz:0,dist:62,az:.6,pol:1.0},
+ ro1:{tx:12,ty:0,tz:0,dist:92,az:.7,pol:.95},
+ ro2:{tx:58,ty:0,tz:0,dist:62,az:.7,pol:.95},
+ dem:{tx:96,ty:0,tz:0,dist:66,az:.6,pol:.95},
+ ctl:{tx:62,ty:3,tz:-20,dist:95,az:.45,pol:1.0}
+};
+function setPreset(k){Object.assign(goal,presets[k]);document.querySelectorAll('#stages button').forEach(b=>b.classList.toggle('on',b.dataset.k===k))}
+
+const stagesDef=[
+ ['all','نمای کلی','#8ba2b0','از آبگیری تا مخزن دمین، طول مجموعه حدود 200 متر در مقیاس نمایشی'],
+ ['pre','پیش‌تصفیه و فیلتراسیون','var(--filt)','انعقاد با FeCl3، 24 فیلتر دولایه، SBS و آنتی‌اسکالانت، فیلتر کارتریج 5 میکرون. حذف ذرات و کلوئید، SDI کمتر از 3. بازیابی 93%.'],
+ ['ro1','بخش ۱: RO1 (SWRO)','var(--p1)','8 قطار، حدود 7,700 المان، بازیابی 40%، فشار 68 تا 72 bar، ERD ایزوباریک. پرمییت 3,732 m³/h با 500 ppm، برد نمونه SP-1 و ذخیره در مخزن RO1.'],
+ ['ro2','بخش ۲: RO2 (BWRO)','var(--p2)','خوراک از مخزن RO1، 4 قطار، حدود 4,850 المان، بازیابی 90%. پرمییت 3,584 m³/h با 10 ppm، برد نمونه SP-2 و ذخیره در مخزن جداگانه RO2.'],
+ ['dem','بخش ۳: واحد دمین','var(--demin)','خوراک از مخزن RO2 با پمپ جداگانه، EDI با بازیابی 93% و بستر مخلوط. خروجی 3,333 m³/h با 0.05 ppm، برد SP-3 و مخزن ذخیره دمین.'],
+ ['ctl','سیستم کنترل یکپارچه','#9be5ff','اتاق کنترل مرکزی DCS/SCADA و سه PLC مستقل برای RO1، RO2 و دمین که با یک شبکه صنعتی به هم وصل‌اند. TDS هر بخش، دبی و آلارم‌ها یک‌جا دیده می‌شود.']
+];
+const st=document.getElementById('stages');
+stagesDef.forEach(([k,t,c,d])=>{const b=document.createElement('button');b.dataset.k=k;
+  b.innerHTML='<i style="background:'+c+'"></i><span><b>'+t+'</b><small>'+d+'</small></span>';
+  b.addEventListener('click',()=>setPreset(k));st.appendChild(b);});
+st.firstChild.classList.add('on');
+
+const rows=[
+ ['آب دریای خام','var(--raw)','9,603','45,000'],
+ ['خروجی پیش‌تصفیه','var(--filt)','8,931','45,000'],
+ ['خوراک RO1 (با بازگشت)','#e8556a','9,329','43,300'],
+ ['پرمییت RO1','var(--p1)','3,732','500'],
+ ['پساب شور RO1','var(--brine)','5,597','71,800'],
+ ['خوراک RO2','var(--p1)','3,983','477'],
+ ['پرمییت RO2','var(--p2)','3,584','10'],
+ ['ریجکت RO2 (بازگشت)','var(--rec)','398','4,700'],
+ ['ریجکت EDI (بازگشت)','var(--rec)','251','142'],
+ ['آب دمین نهایی','var(--demin)','3,333','0.05'],
+ ['پساب بک‌واش فیلتر','var(--bw)','672','SS']
+];
+document.querySelector('#tbl tbody').innerHTML=rows.map(r=>'<tr><td><i style="background:'+r[1]+'"></i>'+r[0]+'</td><td class="n">'+r[2]+'</td><td class="n">'+r[3]+'</td></tr>').join('');
+
+// orbit
+let drag=null,moved=0;const ptrs=new Map();let pinch0=0;
+canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});drag={x:e.clientX,y:e.clientY,btn:e.button,shift:e.shiftKey};moved=0;canvas.classList.add('drag');
+  if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinch0=Math.hypot(a.x-b.x,a.y-b.y)}});
+canvas.addEventListener('pointermove',e=>{
+  if(!ptrs.has(e.pointerId))return;const p=ptrs.get(e.pointerId);const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;moved+=Math.abs(dx)+Math.abs(dy);
+  if(ptrs.size===2){const [a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);if(pinch0){goal.dist=Math.min(320,Math.max(18,goal.dist*pinch0/d));view.dist=goal.dist}pinch0=d;return}
+  if(drag&&(drag.btn===2||drag.shift)){const k=view.dist*.0016;const rx=V(Math.cos(view.az),0,-Math.sin(view.az));goal.tx-=rx.x*dx*k;goal.tz-=rx.z*dx*k;goal.tx-=Math.sin(view.az)*dy*k;goal.tz-=Math.cos(view.az)*dy*k;Object.assign(view,{tx:goal.tx,tz:goal.tz});}
+  else{goal.az-=dx*.006;goal.pol=Math.min(1.5,Math.max(.12,goal.pol-dy*.005));view.az=goal.az;view.pol=goal.pol;}
+});
+canvas.addEventListener('pointerup',e=>{ptrs.delete(e.pointerId);pinch0=0;canvas.classList.remove('drag');if(moved<6&&e.button===0)select(e);drag=null});
+canvas.addEventListener('pointercancel',e=>{ptrs.delete(e.pointerId);drag=null});
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+canvas.addEventListener('wheel',e=>{e.preventDefault();goal.dist=Math.min(320,Math.max(18,goal.dist*(1+Math.sign(e.deltaY)*.1)))},{passive:false});
+
+// selection
+const ray=new THREE.Raycaster();const ndc=new THREE.Vector2();let selMesh=null;
+function select(e){
+  const r=canvas.getBoundingClientRect();ndc.set(((e.clientX-r.left)/r.width)*2-1,-((e.clientY-r.top)/r.height)*2+1);
+  ray.setFromCamera(ndc,camera);const h=ray.intersectObjects(pick,false)[0];
+  if(selMesh&&selMesh.material.emissive)selMesh.material.emissive.setHex(0x000000);
+  const box=document.getElementById('sel');
+  if(!h){selMesh=null;return}
+  selMesh=h.object;selMesh.material.emissive.setHex(0x2a5a66);
+  const i=selMesh.userData.info;box.innerHTML='<b></b><p></p>';box.firstChild.textContent=i.title;box.lastChild.textContent=i.text;
+}
+
+// toggles
+const flags={flow:true,labels:true,rot:false,follow:false,pause:false};
+let spdScale=1;
+// membrane lane particles
+const LP=3;const laneInst=new THREE.InstancedMesh(new THREE.SphereGeometry(.15,6,6),new THREE.MeshBasicMaterial({color:0xffffff}),lanes.length*LP);
+laneInst.frustumCulled=false;scene.add(laneInst);
+const cA=new THREE.Color(),cB=new THREE.Color(),cT=new THREE.Color();
+function updateLanes(ft){let n=0;
+  for(const L of lanes){cA.setHex(L.c0);cB.setHex(L.c1);
+    for(let k=0;k<LP;k++){const f=((ft*.35)+k/LP)%1;dummy.position.set(L.x0+f*(L.x1-L.x0),L.y,L.z);dummy.scale.setScalar(1);dummy.updateMatrix();laneInst.setMatrixAt(n,dummy.matrix);
+      cT.copy(cA).lerp(cB,f*f);laneInst.setColorAt(n,cT);n++}}
+  laneInst.instanceMatrix.needsUpdate=true;laneInst.instanceColor.needsUpdate=true}
+// guided water drop
+const R=[
+[-60,1.8,0,45000,1,'Seawater intake'],[-52,1.8,0,45000,1.5,'Seawater intake'],[-48,2,0,45000,1,'Coagulation and flocculation'],[-44,2,0,45000,1,'Coagulation and flocculation'],
+[-38,2,0,45000,2,'Dual media filter'],[-38,2,1.25,45000,2,'Dual media filter'],[-37,1.4,1.25,45000,2,'Dual media filter',1],[-29,1.4,1.25,45000,1.5,'Dual media filter'],[-27,2,1.25,45000,1.5,'Filtered water header'],[-27,2,0,45000,1.5,'Filtered water header'],
+[-19,2,0,45000,1.5,'Cartridge filter 5 um'],[-19,2,1.25,45000,1.5,'Cartridge filter 5 um'],[-16,2,1.25,45000,1.2,'Cartridge filter 5 um'],[-13,1.5,1.25,45000,1.2,'Low-pressure header'],[-13,1.5,0,45000,1.2,'Low-pressure header'],[-9,1.5,0,45000,1.2,'Low-pressure header'],[-9,1.5,2.1,45000,2,'Low-pressure header'],
+[-6.4,1.5,2.1,45000,2,'High-pressure pump'],[-2,1.2,2.1,43300,68,'High-pressure pump'],[8,1.2,2.1,43300,67.5,'High-pressure line'],[10.6,1.8,2.1,43300,67,'SWRO membranes',1],[19.2,1.8,2.1,500,64,'SWRO membranes'],
+[19.2,2.9,2.1,500,1.5,'RO1 permeate header'],[21,2.9,2.1,500,1.5,'RO1 permeate header'],[21,2.9,0,500,1.5,'RO1 permeate header'],[21,6.5,0,500,1.2,'RO1 permeate header'],[38,6.5,0,500,1.2,'RO1 permeate header'],[38,4,0,500,1,'Intermediate tank'],[42,3,0,500,.2,'Intermediate tank'],[46,2,0,500,1,'Intermediate tank'],
+[48,2,0,500,2,'Pass 2 pump'],[48,2,2.1,500,2,'Pass 2 pump'],[49,1.4,2.1,500,2,'Pass 2 pump'],[52.4,1.2,2.1,500,10,'Pass 2 pump'],[55,1.2,2.1,477,10,'BWRO membranes',1],[62,1.8,2.1,10,8,'BWRO membranes'],
+[62,2.9,2.1,10,1.5,'RO2 permeate header'],[64,2.9,2.1,10,1.5,'RO2 permeate header'],[64,2.9,0,10,1.5,'RO2 permeate header'],[68,2.9,0,10,1.2,'RO2 storage tank'],[72,3,0,10,.2,'RO2 storage tank'],[76,2.9,0,10,1,'RO2 storage tank'],
+[79,2.9,0,10,3,'Demin feed pump'],[82.2,2.9,0,10,3,'Demin feed pump'],[86,2.9,0,10,1.5,'Demin feed header'],[86,2.9,2.1,10,1.5,'Demin feed header'],
+[87.7,2.9,2.1,10,3,'EDI module',1],[92.7,2.4,2.1,.3,2,'EDI module'],[97.2,2.4,2.1,.3,2,'Mixed bed polisher',1],[99.3,2.4,2.1,.05,2,'Mixed bed polisher'],[102,2.4,2.1,.05,1.5,'Demin product line'],[102,2.4,0,.05,1.5,'Demin product line'],[104,2.4,0,.05,1.2,'Demin product line'],[110,3.5,0,.05,0,'Demin storage tank']
+];
+const RV=R.map(r=>V(r[0],r[1],r[2]));const RC=[0];for(let i=1;i<RV.length;i++)RC.push(RC[i-1]+RV[i].distanceTo(RV[i-1]));const RL=RC[RC.length-1];
+const drop=new THREE.Mesh(new THREE.SphereGeometry(.85,20,20),new THREE.MeshBasicMaterial({color:0xffffff}));drop.visible=false;scene.add(drop);
+const glow=new THREE.PointLight(0xffffff,1.2,22);drop.add(glow);
+const TR=28;const trail=new THREE.InstancedMesh(new THREE.SphereGeometry(1,10,10),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.55}),TR);trail.visible=false;trail.frustumCulled=false;scene.add(trail);
+const hud=document.getElementById('hud'),hs=document.getElementById('hs'),ht=document.getElementById('ht'),hp=document.getElementById('hp'),hb=document.getElementById('hb');
+let ds=0;const cRaw=new THREE.Color(0x2f86c4),cOut=new THREE.Color(0xf4f7a8),cD=new THREE.Color();
+function atS(s){let i=1;while(i<RC.length-1&&RC[i]<s)i++;const f=(s-RC[i-1])/(RC[i]-RC[i-1]);return{i,f,p:RV[i-1].clone().lerp(RV[i],f)}}
+function fmt(v){return v>=100?Math.round(v).toLocaleString('en-US'):v>=1?v.toFixed(1):v.toFixed(2)}
+function tourUpdate(dt){
+  drop.visible=trail.visible=hud.hidden=!flags.follow;if(!flags.follow)return;
+  const a=atS(ds),A=R[a.i-1],B=R[a.i];
+  if(!flags.pause)ds=(ds+dt*13*spdScale*(A[6]?.4:1))%RL;
+  const tds=Math.exp(Math.log(A[3])*(1-a.f)+Math.log(B[3])*a.f),bar=A[4]*(1-a.f)+B[4]*a.f;
+  hs.textContent=B[5];ht.textContent='TDS '+fmt(tds)+' ppm';hp.textContent=fmt(bar)+' bar';hb.style.width=(100*ds/RL)+'%';
+  const k=Math.min(1,Math.max(0,Math.log10(45000/tds)/Math.log10(45000/.05)));cD.copy(cRaw).lerp(cOut,k);
+  drop.material.color.copy(cD);glow.color.copy(cD);drop.position.copy(a.p);
+  trail.material.color.copy(cD);
+  for(let j=0;j<TR;j++){const q=atS(((ds-j*.9)%RL+RL)%RL);dummy.position.copy(q.p);dummy.scale.setScalar(.7*(1-j/TR));dummy.updateMatrix();trail.setMatrixAt(j,dummy.matrix)}
+  trail.instanceMatrix.needsUpdate=true;
+  const l=Math.min(1,dt*3);goal.tx+=(a.p.x-goal.tx)*l;goal.ty+=(a.p.y-goal.ty)*l;goal.tz+=(a.p.z-goal.tz)*l;goal.dist+=(36-goal.dist)*l;goal.pol+=(.95-goal.pol)*l;
+}
+document.getElementById('tools').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.k;
+  if(k==='spd'){const v=[1,2,.5,1];const o=[1,2,.5];spdScale=v[v.indexOf(spdScale)+1===4?0:v.indexOf(spdScale)+1];b.textContent='Speed x'+spdScale;return}
+  flags[k]=!flags[k];b.setAttribute('aria-pressed',flags[k]);
+  if(k==='follow'){if(flags.follow){ds=0;goal.az=.6}else setPreset('all')}
+  if(k==='labels')labels.forEach(l=>l.visible=flags.labels);if(k==='flow')flows.forEach(f=>f.inst.visible=flags.flow)});
+
+function resize(){const r=canvas.getBoundingClientRect();renderer.setSize(r.width,r.height,false);camera.aspect=r.width/Math.max(r.height,1);camera.updateProjectionMatrix()}
+new ResizeObserver(resize).observe(canvas.parentElement);resize();
+
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const clock=new THREE.Clock();let ft=0;
+function frame(){
+  const dt=clock.getDelta(),t=clock.elapsedTime;
+  if(flags.rot)goal.az+=dt*.12;
+  for(const k of ['tx','ty','tz','dist','az','pol'])view[k]+=(goal[k]-view[k])*Math.min(1,dt*5);
+  const sp=Math.sin(view.pol);
+  camera.position.set(view.tx+view.dist*sp*Math.sin(view.az),view.ty+view.dist*Math.cos(view.pol),view.tz+view.dist*sp*Math.cos(view.az));
+  camera.lookAt(view.tx,view.ty,view.tz);
+  if(!flags.pause&&!reduce)ft+=dt*spdScale;
+  if(flags.flow&&!reduce)updateFlows(ft);
+  updateLanes(ft);tourUpdate(dt);updateBoards(t,dt);
+  for(const T of tanks){const lv=T.base+T.amp*Math.sin(t*.8+T.ph);T.w.scale.y=lv*T.h;T.w.position.set(T.w.position.x,T.bottom+lv*T.h/2,T.w.position.z)}
+  const p=seaGeo.attributes.position;
+  for(let i=0;i<p.count;i++){p.array[i*3+2]=Math.sin(seaBase[i*3]*.35+t*.9)*.18+Math.cos(seaBase[i*3+1]*.3+t*.7)*.14}
+  p.needsUpdate=true;seaGeo.computeVertexNormals();
+  renderer.render(scene,camera);requestAnimationFrame(frame);
+}
+updateFlows(0);
+(document.fonts&&document.fonts.ready?document.fonts.ready:Promise.resolve()).then(()=>{});
+frame();
+})();
+</script>
+
+</body></html>
